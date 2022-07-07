@@ -73,7 +73,7 @@ class PushFight:
             for dir in dirs:
                 y=ogy+dir[1]
                 x=ogx+dir[0]
-                if inb((x,y)) self.empty((x,y)):
+                if  self.empty((x,y)):
                     todopos.append((x,y))
                     available_pos.append((x,y))
         return available_pos
