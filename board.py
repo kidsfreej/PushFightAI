@@ -2,14 +2,17 @@ from copy import copy
 
 import numpy as np
 
-emojimode = 1
+emojimode = 0
 
 WCIRCLE = 0
 WSQUARE = 1
 BCIRCLE = 2
 BSQUARE =3
+
+def op_turn(turn):
+    return turn^1
 def piece_to_turn(piece):
-    return [-1,-1,0,0,1,1][piece]
+    return [-1,-1,0,0,1,1][piece+2]
 def square(turn):
     return 0+turn*2
 def circle(turn):
@@ -31,7 +34,7 @@ class PushFight:
         if  board is None:
             self.board = self.pboard_to_arr([[-2,-2,-1,1,3,-1,-1,-2],
                           [-1,-1,-1,0,2,3,-1,-1],
-                          [-1,-1,1,0,2,-1,-1,-1],
+                          [0,3,1,0,2,-1,-1,-1],
                           [-2,-1,-1,1,3,-1,-2,-2]])
         else:
             self.board = board
@@ -53,18 +56,20 @@ class PushFight:
         self.board[pos[1]][pos[0]] =np.eye(6)[value+2]
     def __repr__(self):
         s = "\t\t_________________________________\n"
-        
+
         for y in range(4):
             for x in range(8):
                 if (x,y)==self.anchor:
                     s+="|"
                 v = self[x,y]
-                if emojimode:
+                if emojimode==1:
                     s+= ["","-","⚪","⬜","⚫","⬛"][v+2]
-                else:
+                elif emojimode==0:
                     s+= ["","-","⚫","⬛","⚪","⬜"][v+2]
+                else:
+                    s += ["", "-", "WC", "WS", "BC", "BS"][v + 2]
                 if (x,y)==self.anchor:
-                    s+="|"
+                    s+="|"+str(x)+", "+str(y)
                 s+="\t"
             s+="\n"
         return s+ "\t‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n"
@@ -72,7 +77,7 @@ class PushFight:
         for y in range(4):
             for x in range(8):
                 v  = self[x,y]
-                if self[x,y]>=0+turn*2:
+                if piece_to_turn(v)==turn:
                     yield (v,(x,y))
 
     def empty(self,pos):
@@ -82,7 +87,7 @@ class PushFight:
         dirs = ((1,0),(0,1),(-1,0),(0,-1))
 
         searched.add(pos)
-        available_pos = [pos]
+        available_pos = []
         todopos = [pos]
         while todopos:
             ogx,ogy = todopos.pop(0)
@@ -90,7 +95,7 @@ class PushFight:
                 y=ogy+dir[1]
                 x=ogx+dir[0]
 
-                
+
                 if inb((x,y)) and self.empty((x,y)) and (x,y) not in searched:
                     todopos.append((x,y))
                     available_pos.append((x,y))
@@ -107,31 +112,38 @@ class PushFight:
         ogx,ogy = pos
         for dir in dirs:
             # check anchor. this will be my only comment
-            # jk i will do more comments especially on my mcst 
+            # jk i will do more comments especially on my mcst
             if self.anchor[1] == pos[1] and ((dir == (1,0) and self.anchor[0]>pos[0]) or (dir == (-1,0) and self.anchor[0]<pos[0])):
-                break
+                continue
             if self.anchor[0]==pos[0] and ((dir == (0,1) and self.anchor[1]>pos[1]) or (dir == (0,-1) and self.anchor[1]<pos[1])):
-                break
+                continue
 
-            
+
             x = ogx+dir[0]
             y = ogy+dir[1]
             if not inb((x,y)) or self.empty((x,y)):
-                break
-            if dir[1]!=0:
-                while inb((x,y)) and not self.empty((x,y)):
-                    x+=dir[0]
-                    y+=dir[1]
-                    if y<0 or y>3:
-                        break
-                else:
-                    available_dirs.append(dir)
+                continue
+
+            while inb((x,y)) and not self.empty((x,y)):
+                x+=dir[0]
+                y+=dir[1]
+                if y<0 or y>3:
+                    break
             else:
-                available_dirs.append(dir)
+                if inb((x,y)) or piece_to_turn(self[x-dir[0]*3,y-dir[1]*3])!=piece_to_turn(self[pos]):
+                    available_dirs.append(dir)
+                else:
+                    c = copy(self)
+                    c.make_push(pos,dir)
+                    print("BAned move")
+                    print(c)
+                    print(self)
+                    print()
         return available_dirs
     def make_move(self,ogpos,newpos):
-        self[newpos] = self[ogpos]
-        self[ogpos] = -1
+        if ogpos!=newpos:
+            self[newpos] = self[ogpos]
+            self[ogpos] = -1
     def make_push(self,pos,dir):
         ogx, ogy = pos
         carry = self[pos]
@@ -143,16 +155,50 @@ class PushFight:
             t = carry
             carry = self[x,y]
             self[x,y] = t
-            x,y = x+dir[0],y+dir[1]
-            
             if inb((x,y)) and not self.empty((x,y)):
                 break
+            x,y = x+dir[0],y+dir[1]
+
+
         else:
             return piece_to_turn(self[(ogx+dir[0],ogy+dir[1])])
         return -1
-    def permutation(self,turn):
-        for piece,pos in self.pieces(turn):
+    def random_move(self):
+        turn = self.turn
+        for piece, pos in self.pieces(turn):
+            if iscircle(piece):
+                for move in self.available_moves(pos):
+                    first_board = copy(self)
+                    first_board.make_move(pos, move)
+                    for piece2, pos2 in first_board.pieces(turn):
+                        if iscircle(piece2):
+                            for move2 in first_board.available_moves(pos2):
+                                second_board = copy(first_board)
+                                second_board.make_move(pos2, move2)
+                                for squarep, pos3 in second_board.pieces(turn):
+                                    if issquare(squarep):
+                                        for push in second_board.available_pushes(pos3):
+                                            third_board = copy(second_board)
+                                            third_board.make_push(pos3, push)
+                                            # print(second_board)
+                                            return third_board
+                        else:
+                            for push in first_board.available_pushes(pos2):
+                                second_board = copy(first_board)
+                                second_board.make_push(pos2, push)
+                                print(second_board)
+            else:
+                for push in self.available_pushes(pos):
+                    first_board = copy(self)
+                    first_board.make_push(pos, push)
+                    print(first_board)
 
+    def permutation(self,turn,rounds):
+        if rounds==0:
+            return 0
+        counter = 0
+
+        for piece,pos in self.pieces(turn):
             if iscircle(piece):
                 for move in self.available_moves(pos):
                     first_board = copy(self)
@@ -167,23 +213,39 @@ class PushFight:
                                         for push in second_board.available_pushes(pos3):
                                             third_board = copy(second_board)
                                             third_board.make_push(pos3,push)
+                                            # print(second_board)
                                             print(third_board)
+                                            counter += third_board.permutation(op_turn(turn), rounds - 1)
+                                            counter+=1
                         else:
                             for push in first_board.available_pushes(pos2):
                                 second_board = copy(first_board)
                                 second_board.make_push(pos2,push)
                                 print(second_board)
+                                counter += second_board.permutation(op_turn(turn), rounds - 1)
+                                counter+=1
             else:
                 for push in self.available_pushes(pos):
                     first_board = copy(self)
                     first_board.make_push(pos,push)
+                    counter+=first_board.permutation(op_turn(turn),rounds-1)
                     print(first_board)
+                    counter+=1
 
-                                
+        return counter
+    # def random_game(self):
+
+
     # def __repr__(self):
 b=PushFight()
-b.permutation(0)
-# d = b.available_pushes((3,0))[0]
+print(b)
+# print(b.available_pushes((1,2)))
+print(b.permutation(0,1))
+# print(b)
+# print(b.available_pushes((6,1)))
+# print(b.permutation(0,2))
+# d = b.available_pushes((3
+# ,0))[0]
 # print(d)
 # print(b.make_push((3,0),d))
 # print(b)
