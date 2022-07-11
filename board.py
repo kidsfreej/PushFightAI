@@ -333,15 +333,17 @@ def str_to_board(st):
 
     # def __repr__(self):
 class MonteCarloTree:
-    def __init__(self,player):
+    def __init__(self,player,head):
         self.player = player
-
+        self.head = head
+    def __repr__(self):
+        return str(self.head)
 def float_eq(a, b, rel_tol=1e-09, abs_tol=0.0):
     return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 class MonteCarloNode:
     DELETE_ME = None
-    def __init__(self,board: PushFight,step,turn,tree:MonteCarloTree,parent: MonteCarloNode):
+    def __init__(self,board: PushFight,step,turn,tree:MonteCarloTree,parent: MonteCarloNode,index:int):
         #steps
         #0 = first move
         #1 = second move
@@ -356,6 +358,7 @@ class MonteCarloNode:
         self.score = 0
         self.probability = 1
         self.parent = parent
+        self.index = index
     def rollout(self):
         v = self.rollout_helper()
         self.create_babies()
@@ -414,6 +417,11 @@ class MonteCarloNode:
                 max_value = uct
                 max_nodes = [baby]
         return max_nodes
+
+    def deletion(self,index):
+        self.babies.pop(index)
+        for i in range(index,len(self.babies)):
+            self.babies[i].index = i
     def selection(self):
         self.visits += 1
         if len(self.babies) == 0:
@@ -431,6 +439,9 @@ class MonteCarloNode:
                 self.score +=score
                 return score
             score = baby.rollout()
+            if score==MonteCarloNode.DELETE_ME:
+                self.parent.deletion(self.index)
+                return 0
             baby.score+=score
             self.score+=score
             return score
@@ -446,14 +457,14 @@ class MonteCarloNode:
                 for mov in self.board.available_moves(pos):
                     c = copy(self.board)
                     c.make_move(pos,mov)
-                    self.babies.append(MonteCarloNode(c,self.step+1,self.turn,self.tree,self))
+                    self.babies.append(MonteCarloNode(c,self.step+1,self.turn,self.tree,self,len(self.babies)-1))
         elif self.step==1:
             for piece, pos in self.board.squares(self.turn):
                 for push in self.board.available_pushes(pos):
                     c = copy(self.board)
                     c.make_push(pos,push)
                     c.turn = op_turn(self.turn)
-                    n =MonteCarloNode(c,2,self.turn,self.tree,self)
+                    n =MonteCarloNode(c,2,self.turn,self.tree,self,len(self.babies)-1)
                     if c.state()==1:
                         n.iswinner = True
                     self.babies.append(n)
@@ -463,11 +474,13 @@ class MonteCarloNode:
                     c = copy(self.board)
                     c.turn  = op_turn(self.turn)
                     c.make_move(pos,mov)
-                    self.babies.append(MonteCarloNode(c,0,op_turn(self.turn),self.tree,self))
+                    self.babies.append(MonteCarloNode(c,0,op_turn(self.turn),self.tree,self,len(self.babies)-1))
         else:
             raise Exception("down in el paso my life would be worthless")
-    def __repr__(self):
+    def __str__(self):
         return f"<{self.visits} {self.score} {self.board} {self.babies}>"
+    def __repr__(self):
+        return f"<{self.visits} {self.score} {self.board}>"
 # b = str_to_board("""		⚪	⬜	-	    ⬛	-
 # ⚪	⬜	⬜	-	-	-	-	-
 # ⚫	-	|⬛|	-	-	⬛	-	-
@@ -479,29 +492,32 @@ b=PushFight()
 # p  =b.permutation(0,1)
 # print(p)
 # print(len(p))
+print(b.available_moves((5,1)))
 # while True:
 #     b.random_move(1)
 #     print(b)
-t = MonteCarloTree(0)
-n = MonteCarloNode(b,-1,0,t,None)
+t = MonteCarloTree(1,None)
+n = MonteCarloNode(b,-1,1,t,None,0)
+t.head = n
 n.create_babies()
-for i in range(1):
-    n.selection()
-print(n)
-m = -1
-mb = None
-for x in n.babies:
-    if x.visits>m:
-        m = x.visits
-        mb = x
-print(mb)
-m = -99
-mb = None
-for x in n.babies:
-    if x.score>m:
-        m = x.score
-        mb = x
-print(mb)
+print(t)
+# for i in range(20):
+#     n.selection()
+# print(t)
+# m = -1
+# mb = None
+# for x in n.babies:
+#     if x.visits>m:
+#         m = x.visits
+#         mb = x
+# print(mb)
+# m = -99
+# mb = None
+# for x in n.babies:
+#     if x.score>m:
+#         m = x.score
+#         mb = x
+# print(mb)
 # print(n)
 # while True:
 #     print(b.random_move())
