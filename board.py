@@ -393,7 +393,12 @@ class MonteCarloNode:
             c = copy(self.board)
             while c.random_move(2):
                 pass
+
+            print("win!!!")
+            print(c.turn)
+            print(c)
             return 1 if c.turn == self.tree.player else -1
+            
         else:
             raise Exception("uh oh oopsie poopies?!?!?")
 
@@ -489,18 +494,31 @@ class MonteCarloNode:
 # print(b)
 # print(b.permutation(0,1))
 b=PushFight()
+b.turn = 0
+score = 0
+for i in range(100):
+    c = copy(b)
+    while c.random_move(3):
+        pass
+    print(c)
+    score+= 1 if c.turn==1 else -1
+
+print(score)
 # p  =b.permutation(0,1)
 # print(p)
 # print(len(p))
-print(b.available_moves((5,1)))
-# while True:
-#     b.random_move(1)
-#     print(b)
-t = MonteCarloTree(1,None)
-n = MonteCarloNode(b,-1,1,t,None,0)
-t.head = n
-n.create_babies()
-print(t)
+# print(b.available_moves((5,1)))
+# # while True:
+# #     b.random_move(1)
+# #     print(b)
+# b.turn = 1
+# t = MonteCarloTree(1,None)
+# n = MonteCarloNode(b,-1,1,t,None,0)
+# t.head = n
+# n.create_babies()
+# for i in range(100):
+#     n.selection()
+# print(t)
 # for i in range(20):
 #     n.selection()
 # print(t)
