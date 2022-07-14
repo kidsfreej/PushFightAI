@@ -30,7 +30,7 @@ def inb(pos):
 class PushFight:
     edges = ((2,0),(6,0),(0,1),(1,1),(7,1),(0,2),(6,2),(7,2),(1,3),(5,3))
     dirs = ((1,0),(0,1),(-1,0),(0,-1))
-    edge_edge_cases = {(2,0),(6,0),(1,3),(5,3)}
+    edge_dirs = (((-1,0),), ((1,0),), ((0,-1),(-1,0)), ((0,-1),), (( 0,-1),(1,0)))
     def __init__(self,board=None,turn=0,anchor=None):
         # -2 = invalid
         # -1 = empty
@@ -184,6 +184,26 @@ class PushFight:
 
         searched.add(pos)
         available_pos = [pos]
+        todopos = [pos]
+        while todopos:
+            ogx,ogy = todopos.pop(0)
+            for dir in dirs:
+                y=ogy+dir[1]
+                x=ogx+dir[0]
+
+
+                if inb((x,y)) and self.empty((x,y)) and (x,y) not in searched:
+                    todopos.append((x,y))
+                    available_pos.append((x,y))
+                    searched.add((x,y))
+
+        return available_pos
+    def xavailable_moves(self,pos):
+        searched = set()
+        dirs = ((1,0),(0,1),(-1,0),(0,-1))
+
+        searched.add(pos)
+        available_pos = []
         todopos = [pos]
         while todopos:
             ogx,ogy = todopos.pop(0)
@@ -361,14 +381,11 @@ class MonteCarloNode:
         self.index = index
     def rollout(self):
         v = self.rollout_helper()
-        self.create_babies()
+        if v!= MonteCarloNode.DELETE_ME:
+            self.create_babies()
         return v
     def rollout_helper(self):
-        if self.step==2:
-            if self.iswinner==None:
-                self.iswinner = self.board.state()
-            if self.iswinner==1:
-                return 1
+        if self.step==1:
             pushes = []
             for piece,pos in self.board.squares(self.turn):
                 pushes += [(pos,x) for x in self.board.available_pushes(pos)]
@@ -382,21 +399,17 @@ class MonteCarloNode:
             while c.random_move(2):
                 pass
             return 1 if c.turn==self.tree.player else -1
-        elif self.step==1:
+        elif self.step==0:
             c = copy(self.board)
             if c.random_move(1):
                 return 1 if c.turn == self.tree.player else -1
             while c.random_move(2):
                 pass
             return 1 if c.turn == self.tree.player else -1
-        elif self.step==0:
+        elif self.step==2:
             c = copy(self.board)
             while c.random_move(2):
                 pass
-
-            print("win!!!")
-            print(c.turn)
-            print(c)
             return 1 if c.turn == self.tree.player else -1
             
         else:
@@ -459,27 +472,34 @@ class MonteCarloNode:
             raise Exception("??? que el paso new mexico")
         if self.step ==0 or self.step==-1:
             for piece, pos in self.board.pieces(self.turn):
-                for mov in self.board.available_moves(pos):
+                for mov in self.board.xavailable_moves(pos):
                     c = copy(self.board)
                     c.make_move(pos,mov)
-                    self.babies.append(MonteCarloNode(c,self.step+1,self.turn,self.tree,self,len(self.babies)-1))
+                    self.babies.append(MonteCarloNode(c,self.step+1,self.turn,self.tree,self,len(self.babies)))
+            c = copy(self.board)
+            self.babies.append(MonteCarloNode(c,self.step+1,self.turn,self.tree,self,len(self.babies)))
+    
         elif self.step==1:
             for piece, pos in self.board.squares(self.turn):
                 for push in self.board.available_pushes(pos):
                     c = copy(self.board)
                     c.make_push(pos,push)
                     c.turn = op_turn(self.turn)
-                    n =MonteCarloNode(c,2,self.turn,self.tree,self,len(self.babies)-1)
+                    n =MonteCarloNode(c,2,self.turn,self.tree,self,len(self.babies))
                     if c.state()==1:
                         n.iswinner = True
                     self.babies.append(n)
         elif self.step==2:
             for piece, pos in self.board.pieces(op_turn(self.turn)):
-                for mov in self.board.available_moves(pos):
+                for mov in self.board.xavailable_moves(pos):
                     c = copy(self.board)
                     c.turn  = op_turn(self.turn)
                     c.make_move(pos,mov)
-                    self.babies.append(MonteCarloNode(c,0,op_turn(self.turn),self.tree,self,len(self.babies)-1))
+                    self.babies.append(MonteCarloNode(c,0,op_turn(self.turn),self.tree,self,len(self.babies)))
+            c = copy(self.board)
+            self.babies.append(MonteCarloNode(c,0,op_turn(self.turn),self.tree,self,len(self.babies)))
+
+  
         else:
             raise Exception("down in el paso my life would be worthless")
     def __str__(self):
@@ -495,15 +515,23 @@ class MonteCarloNode:
 # print(b.permutation(0,1))
 b=PushFight()
 b.turn = 0
-score = 0
+score= 0 
 for i in range(100):
     c = copy(b)
-    while c.random_move(3):
+    while c.random_move(2):
         pass
-    print(c)
-    score+= 1 if c.turn==1 else -1
-
+    # print(c)
+    score+=1 if c.turn==0 else -1
 print(score)
+# score = 0
+# for i in range(100):
+#     c = copy(b)
+#     while c.random_move(3):
+#         pass
+#     print(c)
+#     score+= 1 if c.turn==1 else -1
+
+# print(score)
 # p  =b.permutation(0,1)
 # print(p)
 # print(len(p))
@@ -512,31 +540,9 @@ print(score)
 # #     b.random_move(1)
 # #     print(b)
 # b.turn = 1
-# t = MonteCarloTree(1,None)
-# n = MonteCarloNode(b,-1,1,t,None,0)
+# t = MonteCarloTree(0,None)
+# n = MonteCarloNode(b,-1,0,t,None,0)
 # t.head = n
 # n.create_babies()
 # for i in range(100):
 #     n.selection()
-# print(t)
-# for i in range(20):
-#     n.selection()
-# print(t)
-# m = -1
-# mb = None
-# for x in n.babies:
-#     if x.visits>m:
-#         m = x.visits
-#         mb = x
-# print(mb)
-# m = -99
-# mb = None
-# for x in n.babies:
-#     if x.score>m:
-#         m = x.score
-#         mb = x
-# print(mb)
-# print(n)
-# while True:
-#     print(b.random_move())
-#     print(b)
